@@ -1,9 +1,8 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import mongoose from 'mongoose';
-import cors from 'cors';
-
-import submissionRoutes from './routes/submissionRoutes.js';
+const express = require('express');
+const dotenv = require('dotenv');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const submissionRoutes = require('./routes/submissionRoutes');
 
 dotenv.config();
 
@@ -12,6 +11,8 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/submissions', submissionRoutes);
+
+console.log('MONGO_URI:', process.env.MONGO_URI);
 
 mongoose
   .connect(process.env.MONGO_URI)

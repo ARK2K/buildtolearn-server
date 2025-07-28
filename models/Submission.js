@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
 const submissionSchema = new mongoose.Schema({
   userId: { type: String, required: true },
@@ -13,4 +13,4 @@ const submissionSchema = new mongoose.Schema({
   submittedAt: { type: Date, default: Date.now },
 });
 
-export default mongoose.model('Submission', submissionSchema);
+module.exports = mongoose.model('Submission', submissionSchema);

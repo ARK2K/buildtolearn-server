@@ -1,6 +1,6 @@
-import Submission from '../models/Submission.js';
+const Submission = require('../models/Submission');
 
-export const createSubmission = async (req, res) => {
+const createSubmission = async (req, res) => {
   try {
     const userId = req.auth.userId;
     const {
@@ -32,7 +32,7 @@ export const createSubmission = async (req, res) => {
   }
 };
 
-export const getUserSubmissions = async (req, res) => {
+const getUserSubmissions = async (req, res) => {
   try {
     const userId = req.auth.userId;
     const submissions = await Submission.find({ userId }).sort({ submittedAt: -1 });
@@ -41,3 +41,5 @@ export const getUserSubmissions = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch submissions' });
   }
 };
+
+module.exports = { createSubmission, getUserSubmissions };

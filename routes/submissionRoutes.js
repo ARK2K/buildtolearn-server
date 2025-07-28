@@ -1,13 +1,13 @@
-import express from 'express';
-import { requireClerkAuth } from '../middleware/clerkAuth.js';
-import {
+const express = require('express');
+const { requireClerkAuth } = require('../middleware/clerkAuth');
+const {
   createSubmission,
   getUserSubmissions,
-} from '../controllers/submissionController.js';
+} = require('../controllers/submissionController');
 
 const router = express.Router();
 
 router.post('/', requireClerkAuth, createSubmission);
 router.get('/user', requireClerkAuth, getUserSubmissions);
 
-export default router;
+module.exports = router;
