@@ -19,8 +19,6 @@ app.get('/', (req, res) => {
   res.send('Welcome to the Build to Learn API');
 });
 
-console.log('MONGO_URI:', process.env.MONGO_URI);
-
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
