@@ -12,6 +12,13 @@ app.use(express.json());
 
 app.use('/api/submissions', submissionRoutes);
 
+const challengeRoutes = require('./routes/challengeRoutes');
+app.use('/api/challenges', challengeRoutes);
+
+app.get('/', (req, res) => {
+  res.send('Welcome to the Build to Learn API');
+});
+
 console.log('MONGO_URI:', process.env.MONGO_URI);
 
 mongoose
