@@ -1,5 +1,15 @@
 const Submission = require('../models/Submission');
+const Leaderboard = require('../models/Leaderboard');
 const Challenge = require('../models/Challenge');
+
+// Simple grading logic
+const gradeSubmission = (starterHtml, submittedHtml) => {
+  const clean = (str) => str.replace(/\s+/g, '').toLowerCase();
+  const passed = clean(starterHtml) === clean(submittedHtml);
+  const score = passed ? 100 : 50;
+  const feedback = passed ? 'Perfect Match!' : 'Partial match. Check structure & tags.';
+  return { score, passed, feedback };
+};
 
 const createSubmission = async (req, res) => {
   try {
@@ -7,22 +17,10 @@ const createSubmission = async (req, res) => {
     const { challengeId, html, css, js } = req.body;
 
     const challenge = await Challenge.findById(challengeId);
-    if (!challenge) {
-      return res.status(404).json({ error: 'Challenge not found' });
-    }
+    if (!challenge) return res.status(404).json({ error: 'Challenge not found' });
 
-    // ✅ Basic HTML grading: normalize and compare HTML
-    const normalize = (str) => (str || '').trim().replace(/\s+/g, ' ');
-    const expectedHTML = normalize(challenge.htmlStarter);
-    const submittedHTML = normalize(html);
+    const { score, passed, feedback } = gradeSubmission(challenge.htmlStarter, html);
 
-    const score = submittedHTML === expectedHTML ? 100 : 50;
-    const passed = score >= 80;
-    const feedback = passed
-      ? '✅ Well done! Your HTML matches the expected structure.'
-      : '❌ Your HTML is close, but not quite there. Try again!';
-
-    // ✅ Save submission
     const submission = await Submission.create({
       userId,
       challengeId,
@@ -35,15 +33,25 @@ const createSubmission = async (req, res) => {
       feedback,
     });
 
+    // Save to leaderboard if high score
+    const existing = await Leaderboard.findOne({ userId, challengeId });
+    if (!existing || score > existing.score) {
+      await Leaderboard.findOneAndUpdate(
+        { userId, challengeId },
+        { userId, challengeId, challengeTitle: challenge.title, score, submittedAt: new Date() },
+        { upsert: true, new: true }
+      );
+    }
+
     res.status(201).json({
       success: true,
       score,
       passed,
       feedback,
-      submissionId: submission._id,
+      submission,
     });
   } catch (err) {
-    console.error('Submission error:', err);
+    console.error(err);
     res.status(500).json({ error: 'Failed to create submission' });
   }
 };
@@ -58,4 +66,20 @@ const getUserSubmissions = async (req, res) => {
   }
 };
 
-module.exports = { createSubmission, getUserSubmissions };
+const getLeaderboard = async (req, res) => {
+  try {
+    const { challengeId } = req.params;
+    const topScores = await Leaderboard.find({ challengeId })
+      .sort({ score: -1, submittedAt: 1 })
+      .limit(10);
+    res.json(topScores);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+};
+
+module.exports = {
+  createSubmission,
+  getUserSubmissions,
+  getLeaderboard,
+};
