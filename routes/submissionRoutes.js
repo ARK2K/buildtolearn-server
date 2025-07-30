@@ -8,8 +8,11 @@ const {
 
 const router = express.Router();
 
+// 🔐 Protected routes
 router.post('/', requireClerkAuth, createSubmission);
 router.get('/user', requireClerkAuth, getUserSubmissions);
-router.get('/leaderboard/:challengeId', getLeaderboard);
+
+// 🌐 Public route — leaderboard per challenge
+router.get('/leaderboard', getLeaderboard);
 
 module.exports = router;

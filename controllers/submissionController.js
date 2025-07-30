@@ -1,28 +1,36 @@
 const Submission = require('../models/Submission');
-const Leaderboard = require('../models/Leaderboard');
-const Challenge = require('../models/Challenge');
+const { Clerk } = require('@clerk/clerk-sdk-node');
 
-// Simple grading logic
-const gradeSubmission = (starterHtml, submittedHtml) => {
-  const clean = (str) => str.replace(/\s+/g, '').toLowerCase();
-  const passed = clean(starterHtml) === clean(submittedHtml);
-  const score = passed ? 100 : 50;
-  const feedback = passed ? 'Perfect Match!' : 'Partial match. Check structure & tags.';
-  return { score, passed, feedback };
-};
+const clerk = Clerk({ secretKey: process.env.CLERK_SECRET_KEY });
 
 const createSubmission = async (req, res) => {
   try {
     const userId = req.auth.userId;
-    const { challengeId, html, css, js } = req.body;
+    const {
+      challengeId,
+      html,
+      css,
+      js,
+    } = req.body;
 
+    // Fetch the challenge title for better readability
+    const Challenge = require('../models/Challenge');
     const challenge = await Challenge.findById(challengeId);
     if (!challenge) return res.status(404).json({ error: 'Challenge not found' });
 
-    const { score, passed, feedback } = gradeSubmission(challenge.htmlStarter, html);
+    // 🔍 Simple grading logic (expandable later)
+    const score = html.includes('<button>') ? 100 : 50;
+    const passed = score >= 80;
+    const feedback = passed ? 'Great job!' : 'Try adding the button tag.';
 
+    // ✅ Get Clerk username
+    const user = await clerk.users.getUser(userId);
+    const username = user.username || user.emailAddresses[0]?.emailAddress || 'Anonymous';
+
+    // 📥 Save submission
     const submission = await Submission.create({
       userId,
+      username,
       challengeId,
       challengeTitle: challenge.title,
       html,
@@ -33,25 +41,14 @@ const createSubmission = async (req, res) => {
       feedback,
     });
 
-    // Save to leaderboard if high score
-    const existing = await Leaderboard.findOne({ userId, challengeId });
-    if (!existing || score > existing.score) {
-      await Leaderboard.findOneAndUpdate(
-        { userId, challengeId },
-        { userId, challengeId, challengeTitle: challenge.title, score, submittedAt: new Date() },
-        { upsert: true, new: true }
-      );
-    }
-
     res.status(201).json({
       success: true,
       score,
-      passed,
       feedback,
       submission,
     });
   } catch (err) {
-    console.error(err);
+    console.error('Create Submission Error:', err);
     res.status(500).json({ error: 'Failed to create submission' });
   }
 };
@@ -62,19 +59,25 @@ const getUserSubmissions = async (req, res) => {
     const submissions = await Submission.find({ userId }).sort({ submittedAt: -1 });
     res.json(submissions);
   } catch (err) {
+    console.error('Get Submissions Error:', err);
     res.status(500).json({ error: 'Failed to fetch submissions' });
   }
 };
 
+// 🏆 Leaderboard (Top Scores per Challenge)
 const getLeaderboard = async (req, res) => {
   try {
-    const { challengeId } = req.params;
-    const topScores = await Leaderboard.find({ challengeId })
+    const { challengeId } = req.query;
+    if (!challengeId) return res.status(400).json({ error: 'Challenge ID required' });
+
+    const topSubmissions = await Submission.find({ challengeId })
       .sort({ score: -1, submittedAt: 1 })
       .limit(10);
-    res.json(topScores);
+
+    res.json(topSubmissions);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to load leaderboard' });
+    console.error('Leaderboard Error:', err);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
   }
 };
 
