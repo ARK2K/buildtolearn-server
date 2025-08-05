@@ -1,18 +1,13 @@
 const Submission = require('../models/Submission');
 const { Clerk } = require('@clerk/clerk-sdk-node');
-const io = require('../socket'); // <== make sure you export Socket.IO instance from server.js
+const io = require('../utils/socket');
 
 const clerk = Clerk({ secretKey: process.env.CLERK_SECRET_KEY });
 
 const createSubmission = async (req, res) => {
   try {
     const userId = req.auth.userId;
-    const {
-      challengeId,
-      html,
-      css,
-      js,
-    } = req.body;
+    const { challengeId, html, css, js } = req.body;
 
     // Fetch the challenge title for better readability
     const Challenge = require('../models/Challenge');
@@ -42,8 +37,9 @@ const createSubmission = async (req, res) => {
       feedback,
     });
 
-    // Emit real-time leaderboard update
-    io.getIO().emit('leaderboard-update', { challengeId });
+    // Emit challenge-specific and global leaderboard updates
+    io.getIO().emit('leaderboard-update', challengeId);
+    io.getIO().emit('leaderboard-update-global');
 
     res.status(201).json({
       success: true,
@@ -71,25 +67,23 @@ const getUserSubmissions = async (req, res) => {
 // 🏆 Per-challenge leaderboard
 const getLeaderboard = async (req, res) => {
   try {
-    const { challengeId } = req.query;
+    const challengeId = req.params.challengeId;
     if (!challengeId) return res.status(400).json({ error: 'Challenge ID required' });
 
     const top = await Submission.aggregate([
       { $match: { challengeId } },
-      {
-        $sort: { score: -1, submittedAt: 1 },
-      },
+      { $sort: { score: -1, submittedAt: 1 } },
       {
         $group: {
           _id: '$userId',
           username: { $first: '$username' },
-          bestScore: { $first: '$score' },
+          score: { $first: '$score' },
           html: { $first: '$html' },
           css: { $first: '$css' },
           js: { $first: '$js' },
         },
       },
-      { $sort: { bestScore: -1 } },
+      { $sort: { score: -1 } },
       { $limit: 10 },
     ]);
 
@@ -105,8 +99,24 @@ const getLeaderboard = async (req, res) => {
   }
 };
 
+// 🌍 Global leaderboard
+const getGlobalLeaderboard = async (req, res) => {
+  try {
+    const top = await Submission.find()
+      .sort({ score: -1, submittedAt: 1 })
+      .limit(50)
+      .select('username challengeTitle score submittedAt');
+
+    res.json(top);
+  } catch (err) {
+    console.error('Global Leaderboard Error:', err);
+    res.status(500).json({ error: 'Failed to fetch global leaderboard' });
+  }
+};
+
 module.exports = {
   createSubmission,
   getUserSubmissions,
   getLeaderboard,
+  getGlobalLeaderboard,
 };

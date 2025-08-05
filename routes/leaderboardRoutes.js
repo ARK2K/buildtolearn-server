@@ -1,7 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { getLeaderboard } = require('../controllers/leaderboardController');
+const {
+  getLeaderboard,
+  getGlobalLeaderboard,
+} = require('../controllers/submissionController');
 
-router.get('/', getLeaderboard);
+// Per-challenge leaderboard
+router.get('/challenge/:challengeId', getLeaderboard);
+
+// 🌍 Global leaderboard
+router.get('/global', getGlobalLeaderboard);
 
 module.exports = router;
