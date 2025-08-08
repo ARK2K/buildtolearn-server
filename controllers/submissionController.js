@@ -1,10 +1,11 @@
 const Submission = require('../models/Submission');
-const { Clerk } = require('@clerk/clerk-sdk-node');
+const clerk = require('@clerk/clerk-sdk-node');
 const io = require('../utils/socket');
 
-const clerk = Clerk({ secretKey: process.env.CLERK_SECRET_KEY });
-
 const createSubmission = async (req, res) => {
+  console.log('Submission payload:', req.body);
+  console.log('Clerk User ID:', req.auth.userId);
+
   try {
     const userId = req.auth.userId;
     const { challengeId, html, css, js } = req.body;

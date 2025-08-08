@@ -4,15 +4,17 @@ const {
   createSubmission,
   getUserSubmissions,
   getLeaderboard,
+  getGlobalLeaderboard,
 } = require('../controllers/submissionController');
 
 const router = express.Router();
 
-// 🔐 Protected routes
+// 🔐 Protected routes (require valid Clerk JWT)
 router.post('/', requireClerkAuth, createSubmission);
 router.get('/user', requireClerkAuth, getUserSubmissions);
 
-// 🌐 Public route — leaderboard per challenge
-router.get('/leaderboard', getLeaderboard);
+// 🌐 Public routes (accessible without auth)
+router.get('/leaderboard/:challengeId', getLeaderboard); // Per-challenge leaderboard
+router.get('/leaderboard/global', getGlobalLeaderboard); // Global leaderboard
 
 module.exports = router;
