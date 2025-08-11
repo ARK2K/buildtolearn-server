@@ -1,6 +1,8 @@
 const Submission = require('../models/Submission');
+const Challenge = require('../models/Challenge');
 const clerk = require('@clerk/clerk-sdk-node');
 const io = require('../utils/socket');
+const { gradeSubmission } = require('../utils/grader');
 
 const createSubmission = async (req, res) => {
   console.log('Submission payload:', req.body);
@@ -10,21 +12,22 @@ const createSubmission = async (req, res) => {
     const userId = req.auth.userId;
     const { challengeId, html, css, js } = req.body;
 
-    // Fetch the challenge title for better readability
-    const Challenge = require('../models/Challenge');
     const challenge = await Challenge.findById(challengeId);
     if (!challenge) return res.status(404).json({ error: 'Challenge not found' });
 
-    // 🔍 Simple grading logic
-    const score = html.includes('<button>') ? 100 : 50;
-    const passed = score >= 80;
-    const feedback = passed ? 'Great job!' : 'Try adding the button tag.';
+    // 🧠 Improved grading logic
+    const { score, feedback, passed } = gradeSubmission({
+      challenge,
+      html,
+      css,
+      js,
+    });
 
-    // ✅ Get Clerk username
+    // 👤 Clerk username fetch
     const user = await clerk.users.getUser(userId);
     const username = user.username || user.emailAddresses[0]?.emailAddress || 'Anonymous';
 
-    // 📥 Save submission
+    // 📥 Save the submission
     const submission = await Submission.create({
       userId,
       username,
@@ -38,7 +41,7 @@ const createSubmission = async (req, res) => {
       feedback,
     });
 
-    // Emit challenge-specific and global leaderboard updates
+    // 🔁 Emit leaderboard updates
     io.getIO().emit('leaderboard-update', challengeId);
     io.getIO().emit('leaderboard-update-global');
 
@@ -65,7 +68,6 @@ const getUserSubmissions = async (req, res) => {
   }
 };
 
-// 🏆 Per-challenge leaderboard
 const getLeaderboard = async (req, res) => {
   try {
     const challengeId = req.params.challengeId;
@@ -100,7 +102,6 @@ const getLeaderboard = async (req, res) => {
   }
 };
 
-// 🌍 Global leaderboard
 const getGlobalLeaderboard = async (req, res) => {
   try {
     const top = await Submission.find()
