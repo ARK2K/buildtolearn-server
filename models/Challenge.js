@@ -1,24 +1,45 @@
-const mongoose = require('mongoose');
+import mongoose from "mongoose";
 
-const cssRuleSchema = new mongoose.Schema({
-  selector: { type: String, required: true },
-  styles: { type: Map, of: String, required: true }
-}, { _id: false });
+const challengeSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true },
+    description: { type: String, required: true },
+    difficulty: {
+      type: String,
+      enum: ["Easy", "Medium", "Hard"],
+      default: "Easy",
+    },
+    starterCode: { type: String, required: true },
+    targetHTML: { type: String, required: true },
+    targetCSS: { type: String, required: true },
+    targetJS: { type: String }, // Optional for DOM behavior tests
 
-const challengeSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  description: String,
-  image: String,
-  difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'easy' },
-  htmlStarter: String,
-  cssStarter: String,
-  jsStarter: String,
+    // Level 1: HTML structure rules
+    structureRules: [
+      {
+        selector: { type: String, required: true },
+        count: { type: Number, required: true },
+      },
+    ],
 
-  // 🆕 Expected output for grading
-  expectedHTML: { type: String, required: true },
-  expectedCSSRules: [cssRuleSchema],
+    // Level 2: CSS style rules
+    cssRules: [
+      {
+        selector: { type: String, required: true },
+        property: { type: String, required: true },
+        value: { type: String, required: true },
+      },
+    ],
 
-  gradingLevel: { type: Number, enum: [1, 2], default: 1 } // 1 = HTML only, 2 = HTML + CSS
-});
+    // Level 3: DOM behavior rules (JS-based interactions)
+    domRules: [
+      {
+        description: { type: String, required: true }, // e.g., "Click button changes text to 'Hello'"
+        testFunction: { type: String, required: true }, // JS test code as string
+      },
+    ],
+  },
+  { timestamps: true }
+);
 
-module.exports = mongoose.model('Challenge', challengeSchema);
+export default mongoose.model("Challenge", challengeSchema);
