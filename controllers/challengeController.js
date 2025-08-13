@@ -1,4 +1,7 @@
 const Challenge = require('../models/Challenge');
+const { cloudinary } = require('../utils/cloudinary');
+
+const FALLBACK_IMAGE_URL = process.env.FALLBACK_IMAGE_URL;
 
 const getChallenges = async (req, res) => {
   try {
@@ -25,7 +28,34 @@ const getChallengeById = async (req, res) => {
 
 const createChallenge = async (req, res) => {
   try {
-    const challenge = await Challenge.create(req.body);
+    const {
+      title,
+      description,
+      level,
+      htmlTemplate,
+      cssTemplate,
+      jsTemplate,
+      imageBase64
+    } = req.body;
+
+    let imageUrl = FALLBACK_IMAGE_URL; // default fallback
+    if (imageBase64) {
+      const uploadedImage = await cloudinary.uploader.upload(imageBase64, {
+        folder: 'buildtolearn/challenges',
+      });
+      imageUrl = uploadedImage.secure_url;
+    }
+
+    const challenge = await Challenge.create({
+      title,
+      description,
+      level,
+      htmlTemplate,
+      cssTemplate,
+      jsTemplate,
+      imageUrl,
+    });
+
     res.status(201).json(challenge);
   } catch (err) {
     console.error('Error creating challenge:', err);

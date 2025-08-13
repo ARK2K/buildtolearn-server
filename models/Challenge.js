@@ -14,6 +14,13 @@ const challengeSchema = new mongoose.Schema(
     targetCSS: { type: String, required: true },
     targetJS: { type: String }, // Optional for DOM behavior tests
 
+    // Reference image (stored in Cloudinary)
+    referenceImage: {
+      type: String,
+      default: process.env.FALLBACK_IMAGE_URL || "", // Always have a fallback
+    },
+    referenceImageId: { type: String }, // Cloudinary public_id for easy deletion/update
+
     // Level 1: HTML structure rules
     structureRules: [
       {
