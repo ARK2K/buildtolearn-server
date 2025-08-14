@@ -1,15 +1,15 @@
-const Challenge = require('../models/Challenge');
-const { cloudinary } = require('../utils/cloudinary');
+const Challenge = require("../models/Challenge");
+const cloudinary = require("../utils/cloudinary");
 
-const FALLBACK_IMAGE_URL = process.env.FALLBACK_IMAGE_URL;
+const FALLBACK_IMAGE_URL = process.env.FALLBACK_IMAGE_URL || "";
 
 const getChallenges = async (req, res) => {
   try {
     const challenges = await Challenge.find();
     res.json(challenges);
   } catch (err) {
-    console.error('Error fetching challenges:', err);
-    res.status(500).json({ error: 'Server error' });
+    console.error("Error fetching challenges:", err);
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -17,12 +17,12 @@ const getChallengeById = async (req, res) => {
   try {
     const challenge = await Challenge.findById(req.params.id);
     if (!challenge) {
-      return res.status(404).json({ error: 'Challenge not found' });
+      return res.status(404).json({ error: "Challenge not found" });
     }
     res.json(challenge);
   } catch (err) {
-    console.error('Error fetching challenge:', err);
-    res.status(500).json({ error: 'Server error' });
+    console.error("Error fetching challenge:", err);
+    res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -31,35 +31,53 @@ const createChallenge = async (req, res) => {
     const {
       title,
       description,
-      level,
-      htmlTemplate,
-      cssTemplate,
-      jsTemplate,
-      imageBase64
+      difficulty,
+      starterCode,
+      targetHTML,
+      targetCSS,
+      targetJS,
+      structureRules,
+      cssRules,
+      domRules
     } = req.body;
 
-    let imageUrl = FALLBACK_IMAGE_URL; // default fallback
-    if (imageBase64) {
-      const uploadedImage = await cloudinary.uploader.upload(imageBase64, {
-        folder: 'buildtolearn/challenges',
+    let referenceImage = FALLBACK_IMAGE_URL;
+    let referenceImageId = "";
+
+    // Upload if base64 string provided
+    if (req.body.imageBase64) {
+      const uploaded = await cloudinary.uploader.upload(req.body.imageBase64, {
+        folder: "buildtolearn/challenges",
       });
-      imageUrl = uploadedImage.secure_url;
+      referenceImage = uploaded.secure_url;
+      referenceImageId = uploaded.public_id;
+    }
+
+    // Upload if multer file provided
+    if (req.file && req.file.path) {
+      referenceImage = req.file.path;
+      referenceImageId = req.file.filename || "";
     }
 
     const challenge = await Challenge.create({
       title,
       description,
-      level,
-      htmlTemplate,
-      cssTemplate,
-      jsTemplate,
-      imageUrl,
+      difficulty,
+      starterCode,
+      targetHTML,
+      targetCSS,
+      targetJS,
+      structureRules,
+      cssRules,
+      domRules,
+      referenceImage,
+      referenceImageId
     });
 
     res.status(201).json(challenge);
   } catch (err) {
-    console.error('Error creating challenge:', err);
-    res.status(500).json({ error: 'Failed to create challenge' });
+    console.error("Error creating challenge:", err);
+    res.status(500).json({ error: "Failed to create challenge" });
   }
 };
 
