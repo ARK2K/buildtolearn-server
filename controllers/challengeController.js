@@ -1,8 +1,6 @@
 const Challenge = require("../models/Challenge");
 const cloudinary = require("../utils/cloudinary");
 
-const FALLBACK_IMAGE_URL = process.env.FALLBACK_IMAGE_URL || "";
-
 const getChallenges = async (req, res) => {
   try {
     const challenges = await Challenge.find();
@@ -38,10 +36,10 @@ const createChallenge = async (req, res) => {
       targetJS,
       structureRules,
       cssRules,
-      domRules
+      domRules,
     } = req.body;
 
-    let referenceImage = FALLBACK_IMAGE_URL;
+    let referenceImage = "";
     let referenceImageId = "";
 
     // Upload if base64 string provided
@@ -70,8 +68,8 @@ const createChallenge = async (req, res) => {
       structureRules,
       cssRules,
       domRules,
-      referenceImage,
-      referenceImageId
+      ...(referenceImage && { referenceImage }),
+      ...(referenceImageId && { referenceImageId }),
     });
 
     res.status(201).json(challenge);
@@ -84,5 +82,5 @@ const createChallenge = async (req, res) => {
 module.exports = {
   getChallenges,
   getChallengeById,
-  createChallenge
+  createChallenge,
 };
