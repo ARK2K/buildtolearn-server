@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getLeaderboard,
+  getChallengeLeaderboard,
   getGlobalLeaderboard,
-} = require('../controllers/submissionController');
+} = require('../controllers/leaderboardController');
 
 // Per-challenge leaderboard
-router.get('/challenge/:challengeId', getLeaderboard);
+router.get('/challenge/:challengeId', getChallengeLeaderboard);
 
 // 🌍 Global leaderboard
 router.get('/global', getGlobalLeaderboard);
