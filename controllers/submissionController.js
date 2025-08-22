@@ -6,9 +6,9 @@ const clerk = require('@clerk/clerk-sdk-node');
 const io = require('../utils/socket');
 const { gradeSubmission } = require('../utils/grader');
 
-const PASS_THRESHOLD = 70; // tweak as you like
+const PASS_THRESHOLD = 70;
 
-// derive a simple feedback string from the grader’s breakdown
+// Build readable feedback
 const buildFeedback = (breakdown) => {
   if (!breakdown) return 'Submitted.';
   const parts = [];
@@ -16,6 +16,40 @@ const buildFeedback = (breakdown) => {
   if (breakdown.css) parts.push(`CSS ${breakdown.css.score}/30`);
   if (breakdown.js) parts.push(`JS ${breakdown.js.score}/30`);
   return `Breakdown: ${parts.join(' · ')}`;
+};
+
+// 🔥 Update UserStats with streaks & badges
+const updateUserStats = async ({ userId, displayName, delta }) => {
+  let stats = await UserStats.findOne({ userId });
+
+  if (!stats) {
+    stats = new UserStats({ userId, displayName, totalScore: 0, badges: [] });
+  }
+
+  stats.totalScore += delta;
+
+  // Streak logic
+  const today = new Date().toDateString();
+  const lastActive = stats.updatedAt ? new Date(stats.updatedAt).toDateString() : null;
+
+  if (lastActive === today) {
+    // already active today
+  } else if (lastActive === new Date(Date.now() - 86400000).toDateString()) {
+    stats.streak = (stats.streak || 0) + 1;
+  } else {
+    stats.streak = 1;
+  }
+
+  // Award badges
+  if (stats.streak === 7 && !stats.badges.includes('🔥 7-day streak')) {
+    stats.badges.push('🔥 7-day streak');
+  }
+  if (stats.streak === 30 && !stats.badges.includes('⚡ 30-day streak')) {
+    stats.badges.push('⚡ 30-day streak');
+  }
+
+  await stats.save();
+  return stats;
 };
 
 const createSubmission = async (req, res) => {
@@ -26,7 +60,7 @@ const createSubmission = async (req, res) => {
     const challenge = await Challenge.findById(challengeId);
     if (!challenge) return res.status(404).json({ error: 'Challenge not found' });
 
-    // Grade using your utils/grader (returns { score, breakdown })
+    // Grade
     const grade = await gradeSubmission({
       expectedHTML: challenge.targetHTML,
       expectedCSSRules: (challenge.cssRules || []).map((r) => ({
@@ -36,17 +70,16 @@ const createSubmission = async (req, res) => {
       submittedHTML: html,
       submittedCSS: css,
       submittedJS: js,
-      behaviorTests: [], // plug in later if you add DOM tests
+      behaviorTests: [],
     });
 
     const score = Math.round(grade.score || 0);
     const passed = score >= PASS_THRESHOLD;
     const feedback = buildFeedback(grade.breakdown);
 
-    // Clerk username/email
+    // Clerk user info
     const user = await clerk.users.getUser(userId);
-    const username =
-      user.username || user.emailAddresses?.[0]?.emailAddress || 'Anonymous';
+    const username = user.username || user.emailAddresses?.[0]?.emailAddress || 'Anonymous';
 
     // Save submission history
     const submission = await Submission.create({
@@ -62,7 +95,7 @@ const createSubmission = async (req, res) => {
       feedback,
     });
 
-    // Upsert into Leaderboard if this is a new best
+    // Leaderboard update
     const existing = await Leaderboard.findOne({ userId, challengeId });
     let deltaForStats = 0;
 
@@ -86,26 +119,16 @@ const createSubmission = async (req, res) => {
       );
     }
 
-    // Update UserStats (sum of bests). Only add the delta for improved bests.
-    if (deltaForStats !== 0) {
-      await UserStats.findOneAndUpdate(
-        { userId },
-        {
-          $setOnInsert: {
-            displayName: username,
-            totalScore: 0,
-            badges: [],
-          },
-          $inc: { totalScore: deltaForStats },
-        },
-        { upsert: true }
-      );
+    // UserStats update (only if improved best)
+    if (deltaForStats > 0) {
+      await updateUserStats({ userId, displayName: username, delta: deltaForStats });
     }
 
     // Emit socket updates
     const ioInstance = io.getIO();
     ioInstance.to(`leaderboard-${challengeId}`).emit('leaderboard-update', challengeId);
     ioInstance.emit('global-leaderboard-update');
+    ioInstance.emit('weekly-leaderboard-update');
 
     res.status(201).json({
       success: true,

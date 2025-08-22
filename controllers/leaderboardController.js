@@ -1,5 +1,6 @@
 const Leaderboard = require('../models/Leaderboard');
 
+// Challenge-specific leaderboard
 const getChallengeLeaderboard = async (req, res) => {
   try {
     const { challengeId } = req.params;
@@ -10,10 +11,9 @@ const getChallengeLeaderboard = async (req, res) => {
       .limit(10)
       .lean();
 
-    // Attach “badge” like before
     const withBadges = rows.map((entry, index) => ({
       ...entry,
-      score: entry.bestScore, // keep field name “score” for UI
+      score: entry.bestScore,
       badge: index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '',
     }));
 
@@ -24,16 +24,15 @@ const getChallengeLeaderboard = async (req, res) => {
   }
 };
 
+// Global leaderboard (across all challenges)
 const getGlobalLeaderboard = async (_req, res) => {
   try {
-    // Top best scores across all challenges
     const top = await Leaderboard.find({})
       .sort({ bestScore: -1, updatedAt: 1 })
       .limit(50)
       .select('username challengeTitle bestScore updatedAt html css js')
       .lean();
 
-    // Keep frontend shape (score + submittedAt)
     const shaped = top.map((r) => ({
       ...r,
       score: r.bestScore,
@@ -47,7 +46,34 @@ const getGlobalLeaderboard = async (_req, res) => {
   }
 };
 
+// Weekly leaderboard (Monday–Sunday)
+const getWeeklyLeaderboard = async (_req, res) => {
+  try {
+    const now = new Date();
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - now.getDay() + 1); // Monday start
+    monday.setHours(0, 0, 0, 0);
+
+    const top = await Leaderboard.find({ createdAt: { $gte: monday } })
+      .sort({ bestScore: -1, updatedAt: 1 })
+      .limit(20)
+      .lean();
+
+    const withBadges = top.map((entry, index) => ({
+      ...entry,
+      score: entry.bestScore,
+      badge: index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '',
+    }));
+
+    res.json(withBadges);
+  } catch (err) {
+    console.error('Weekly leaderboard error:', err);
+    res.status(500).json({ error: 'Failed to fetch weekly leaderboard' });
+  }
+};
+
 module.exports = {
   getChallengeLeaderboard,
   getGlobalLeaderboard,
+  getWeeklyLeaderboard,
 };
