@@ -23,7 +23,7 @@ const updateUserStats = async ({ userId, displayName, delta }) => {
   let stats = await UserStats.findOne({ userId });
 
   if (!stats) {
-    stats = new UserStats({ userId, displayName, totalScore: 0, badges: [] });
+    stats = new UserStats({ userId, displayName, totalScore: 0, streak: 0, badges: [] });
   }
 
   stats.totalScore += delta;
@@ -40,12 +40,20 @@ const updateUserStats = async ({ userId, displayName, delta }) => {
     stats.streak = 1;
   }
 
-  // Award badges
+  // Award streak badges
   if (stats.streak === 7 && !stats.badges.includes('🔥 7-day streak')) {
     stats.badges.push('🔥 7-day streak');
   }
   if (stats.streak === 30 && !stats.badges.includes('⚡ 30-day streak')) {
     stats.badges.push('⚡ 30-day streak');
+  }
+
+  // Award XP milestone badges
+  if (stats.totalScore >= 1000 && !stats.badges.includes('⭐ 1000 XP')) {
+    stats.badges.push('⭐ 1000 XP');
+  }
+  if (stats.totalScore >= 5000 && !stats.badges.includes('🏆 5000 XP')) {
+    stats.badges.push('🏆 5000 XP');
   }
 
   await stats.save();

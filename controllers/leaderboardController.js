@@ -54,7 +54,7 @@ const getWeeklyLeaderboard = async (_req, res) => {
     monday.setDate(now.getDate() - now.getDay() + 1); // Monday start
     monday.setHours(0, 0, 0, 0);
 
-    const top = await Leaderboard.find({ createdAt: { $gte: monday } })
+    const top = await Leaderboard.find({ updatedAt: { $gte: monday } })
       .sort({ bestScore: -1, updatedAt: 1 })
       .limit(20)
       .lean();
