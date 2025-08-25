@@ -1,10 +1,10 @@
 const UserStats = require('../models/UserStats');
-const { updateUserStats } = require('../utils/userStats'); // 🔥 use shared util
+const { updateUserStats } = require('../utils/userStats'); // 🔥 shared util
 
 // GET /api/user-stats/me
 const getMyStats = async (req, res) => {
   try {
-    const userId = req.auth.userId; // ⚡ switched to req.auth for consistency with submissionController
+    const userId = req.auth.userId; // ⚡ using Clerk's auth
     const stats = await UserStats.findOne({ userId });
 
     if (!stats) {
@@ -33,4 +33,26 @@ const getWeeklyLeaderboard = async (req, res) => {
   }
 };
 
-module.exports = { getMyStats, getWeeklyLeaderboard, updateUserStats };
+// GET /api/user-stats/history → fetch logged-in user's archived weekly results
+const getMyHistory = async (req, res) => {
+  try {
+    const userId = req.auth.userId;
+    const stats = await UserStats.findOne({ userId }).select('weeklyHistory');
+
+    if (!stats) {
+      return res.status(404).json({ error: 'User stats not found' });
+    }
+
+    res.json(stats.weeklyHistory || []);
+  } catch (err) {
+    console.error('User history error:', err);
+    res.status(500).json({ error: 'Failed to fetch weekly history' });
+  }
+};
+
+module.exports = { 
+  getMyStats, 
+  getWeeklyLeaderboard, 
+  getMyHistory, 
+  updateUserStats 
+};
