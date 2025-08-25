@@ -57,7 +57,10 @@ const updateUserStats = async ({ userId, displayName, score }) => {
 
   if (lastActive === today) {
     // already active today → no streak change
-  } else if (lastActive === new Date(Date.now() - 86400000).toISOString().split('T')[0]) {
+  } else if (
+    lastActive ===
+    new Date(Date.now() - 86400000).toISOString().split('T')[0]
+  ) {
     stats.streak = (stats.streak || 0) + 1;
   } else {
     stats.streak = 1;

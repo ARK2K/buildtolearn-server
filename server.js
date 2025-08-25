@@ -3,11 +3,14 @@ const http = require('http');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const cron = require('node-cron');
 
 const submissionRoutes = require('./routes/submissionRoutes');
 const challengeRoutes = require('./routes/challengeRoutes');
 const leaderboardRoutes = require('./routes/leaderboardRoutes');
-const socket = require('./utils/socket'); // ✅ Socket module
+const userStatsRoutes = require('./routes/userStatsRoutes'); // ✅ new route
+const socket = require('./utils/socket');
+const UserStats = require('./models/UserStats'); // ✅ required for cron job
 
 dotenv.config();
 
@@ -25,9 +28,20 @@ app.use(express.json());
 app.use('/api/challenges', challengeRoutes);
 app.use('/api/submissions', submissionRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/user-stats', userStatsRoutes);
 
 // Root route
 app.get('/', (req, res) => res.send('Welcome to BuildToLearn API'));
+
+// 🕒 CRON: Reset weeklyScore every Monday at 00:00 UTC
+cron.schedule('0 0 * * 1', async () => {
+  try {
+    await UserStats.updateMany({}, { $set: { weeklyScore: 0 } });
+    console.log('✅ Weekly scores reset successfully');
+  } catch (err) {
+    console.error('❌ Error resetting weekly scores:', err);
+  }
+});
 
 // 🔗 MongoDB + start server
 mongoose
