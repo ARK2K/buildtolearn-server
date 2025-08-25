@@ -8,9 +8,9 @@ const cron = require('node-cron');
 const submissionRoutes = require('./routes/submissionRoutes');
 const challengeRoutes = require('./routes/challengeRoutes');
 const leaderboardRoutes = require('./routes/leaderboardRoutes');
-const userStatsRoutes = require('./routes/userStatsRoutes'); // ✅ new route
+const userStatsRoutes = require('./routes/userStatsRoutes');
 const socket = require('./utils/socket');
-const UserStats = require('./models/UserStats'); // ✅ required for cron job
+const UserStats = require('./models/UserStats');
 
 dotenv.config();
 

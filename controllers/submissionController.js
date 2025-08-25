@@ -1,10 +1,10 @@
 const Submission = require('../models/Submission');
 const Challenge = require('../models/Challenge');
 const Leaderboard = require('../models/Leaderboard');
-const UserStats = require('../models/UserStats');
 const clerk = require('@clerk/clerk-sdk-node');
 const io = require('../utils/socket');
 const { gradeSubmission } = require('../utils/grader');
+const { updateUserStats } = require('../utils/userStats');
 
 const PASS_THRESHOLD = 70;
 
@@ -18,48 +18,6 @@ const buildFeedback = (breakdown) => {
   return `Breakdown: ${parts.join(' · ')}`;
 };
 
-// 🔥 Update UserStats with streaks & badges
-const updateUserStats = async ({ userId, displayName, delta }) => {
-  let stats = await UserStats.findOne({ userId });
-
-  if (!stats) {
-    stats = new UserStats({ userId, displayName, totalScore: 0, streak: 0, badges: [] });
-  }
-
-  stats.totalScore += delta;
-
-  // Streak logic
-  const today = new Date().toDateString();
-  const lastActive = stats.updatedAt ? new Date(stats.updatedAt).toDateString() : null;
-
-  if (lastActive === today) {
-    // already active today
-  } else if (lastActive === new Date(Date.now() - 86400000).toDateString()) {
-    stats.streak = (stats.streak || 0) + 1;
-  } else {
-    stats.streak = 1;
-  }
-
-  // Award streak badges
-  if (stats.streak === 7 && !stats.badges.includes('🔥 7-day streak')) {
-    stats.badges.push('🔥 7-day streak');
-  }
-  if (stats.streak === 30 && !stats.badges.includes('⚡ 30-day streak')) {
-    stats.badges.push('⚡ 30-day streak');
-  }
-
-  // Award XP milestone badges
-  if (stats.totalScore >= 1000 && !stats.badges.includes('⭐ 1000 XP')) {
-    stats.badges.push('⭐ 1000 XP');
-  }
-  if (stats.totalScore >= 5000 && !stats.badges.includes('🏆 5000 XP')) {
-    stats.badges.push('🏆 5000 XP');
-  }
-
-  await stats.save();
-  return stats;
-};
-
 const createSubmission = async (req, res) => {
   try {
     const userId = req.auth.userId;
@@ -68,7 +26,7 @@ const createSubmission = async (req, res) => {
     const challenge = await Challenge.findById(challengeId);
     if (!challenge) return res.status(404).json({ error: 'Challenge not found' });
 
-    // Grade
+    // Grade submission
     const grade = await gradeSubmission({
       expectedHTML: challenge.targetHTML,
       expectedCSSRules: (challenge.cssRules || []).map((r) => ({
