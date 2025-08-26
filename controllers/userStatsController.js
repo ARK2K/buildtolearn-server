@@ -1,10 +1,10 @@
 const UserStats = require('../models/UserStats');
 const { updateUserStats } = require('../utils/userStats');
 
-// GET /api/user-stats/me
+// GET /api/user-stats/me → fetch logged-in user's current stats
 const getMyStats = async (req, res) => {
   try {
-    const userId = req.auth.userId; // ⚡ using Clerk's auth
+    const userId = req.auth.userId; // Clerk's auth
     const stats = await UserStats.findOne({ userId });
 
     if (!stats) {
@@ -33,7 +33,7 @@ const getWeeklyLeaderboard = async (req, res) => {
   }
 };
 
-// GET /api/user-stats/history → fetch logged-in user's archived weekly results
+// GET /api/user-stats/history → logged-in user's archived weekly results
 const getMyHistory = async (req, res) => {
   try {
     const userId = req.auth.userId;
@@ -43,11 +43,11 @@ const getMyHistory = async (req, res) => {
       return res.status(404).json({ error: 'User stats not found' });
     }
 
-    // Sort history newest first
+    // Sort history by week end date (newest first)
     const sortedHistory = (stats.weeklyHistory || [])
       .sort((a, b) => new Date(b.weekEnd) - new Date(a.weekEnd));
 
-    // Add "label" for charting convenience (like "Aug 12 - Aug 18")
+    // Format history for charts/tables
     const formattedHistory = sortedHistory.map(entry => {
       const weekStart = new Date(entry.weekStart);
       const weekEnd = new Date(entry.weekEnd);
