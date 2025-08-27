@@ -8,7 +8,16 @@ const getMyStats = async (req, res) => {
     const stats = await UserStats.findOne({ userId });
 
     if (!stats) {
-      return res.status(404).json({ error: 'User stats not found' });
+      // Return a default object instead of 404
+      return res.json({
+        userId,
+        displayName: '',
+        totalScore: 0,
+        weeklyScore: 0,
+        streak: 0,
+        badges: [],
+        weeklyHistory: [],
+      });
     }
 
     res.json(stats);
@@ -39,24 +48,39 @@ const getMyHistory = async (req, res) => {
     const userId = req.auth.userId;
     const stats = await UserStats.findOne({ userId }).select('weeklyHistory');
 
-    if (!stats) {
-      return res.status(404).json({ error: 'User stats not found' });
-    }
+    // Always return an array (empty if no history or no user stats yet)
+    const history = stats?.weeklyHistory || [];
 
-    // Sort history by week end date (newest first)
-    const sortedHistory = (stats.weeklyHistory || [])
-      .sort((a, b) => new Date(b.weekEnd) - new Date(a.weekEnd));
+    // Sort history by week start date (oldest → newest for streak progression)
+    const sortedHistory = history.sort(
+      (a, b) => new Date(a.weekStart) - new Date(b.weekStart)
+    );
 
-    // Format history for charts/tables
+    // Track streak progression
+    let streakCounter = 0;
     const formattedHistory = sortedHistory.map(entry => {
       const weekStart = new Date(entry.weekStart);
       const weekEnd = new Date(entry.weekEnd);
 
-      const label = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+      // Update streak (resets if no submissions or score is 0)
+      if (entry.submissions > 0 || entry.score > 0) {
+        streakCounter += 1;
+      } else {
+        streakCounter = 0;
+      }
+
+      const label = `${weekStart.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      })} - ${weekEnd.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      })}`;
 
       return {
         ...entry.toObject(),
         label,
+        streak: streakCounter,
       };
     });
 
