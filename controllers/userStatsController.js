@@ -35,6 +35,40 @@ function computeCurrentStreak(weeklyHistory = []) {
   return streak;
 }
 
+// --- helper to compute highest streak in history ---
+function computeHighestStreak(weeklyHistory = []) {
+  if (!weeklyHistory.length) return 0;
+
+  // Sort oldest → newest
+  const sorted = [...weeklyHistory].sort(
+    (a, b) => new Date(a.weekStart) - new Date(b.weekStart)
+  );
+
+  let streakCounter = 0;
+  let highest = 0;
+  let prevWeekEnd = null;
+
+  for (const entry of sorted) {
+    const weekStart = new Date(entry.weekStart);
+    const weekEnd = new Date(entry.weekEnd);
+
+    const missedWeek =
+      prevWeekEnd &&
+      weekStart - prevWeekEnd > 7 * 24 * 60 * 60 * 1000;
+
+    if ((entry.submissions > 0 || entry.score > 0) && !missedWeek) {
+      streakCounter++;
+      highest = Math.max(highest, streakCounter);
+    } else {
+      streakCounter = 0;
+    }
+
+    prevWeekEnd = weekEnd;
+  }
+
+  return highest;
+}
+
 // GET /api/user-stats/me → fetch logged-in user's current stats
 const getMyStats = async (req, res) => {
   try {
@@ -49,17 +83,20 @@ const getMyStats = async (req, res) => {
         totalScore: 0,
         weeklyScore: 0,
         streak: 0,
+        highestStreak: 0,
         badges: [],
         weeklyHistory: [],
       });
     }
 
-    // Compute streak dynamically
+    // Compute streaks dynamically
     const currentStreak = computeCurrentStreak(stats.weeklyHistory);
+    const highestStreak = computeHighestStreak(stats.weeklyHistory);
 
     res.json({
       ...stats.toObject(),
       streak: currentStreak,
+      highestStreak,
     });
   } catch (err) {
     console.error('User stats error:', err);
@@ -77,12 +114,14 @@ const getWeeklyLeaderboard = async (req, res) => {
 
     // Compute streak dynamically for each user
     const leaderboardWithStreaks = leaderboard.map((user) => {
-      const streak = computeCurrentStreak(user.weeklyHistory || []);
+      const currentStreak = computeCurrentStreak(user.weeklyHistory || []);
+      const highestStreak = computeHighestStreak(user.weeklyHistory || []);
       return {
         displayName: user.displayName,
         weeklyScore: user.weeklyScore,
         badges: user.badges,
-        streak,
+        streak: currentStreak,
+        highestStreak,
       };
     });
 
@@ -107,6 +146,7 @@ const getMyHistory = async (req, res) => {
     );
 
     let streakCounter = 0;
+    let highestStreak = 0;
     let prevWeekEnd = null;
 
     const formattedHistory = sortedHistory.map((entry) => {
@@ -116,10 +156,11 @@ const getMyHistory = async (req, res) => {
 
       const missedWeek =
         prevWeekEnd &&
-        weekStart - prevWeekEnd > 7 * 24 * 60 * 60 * 1000; // gap > 7 days
+        weekStart - prevWeekEnd > 7 * 24 * 60 * 60 * 1000;
 
       if ((entryObj.submissions > 0 || entryObj.score > 0) && !missedWeek) {
         streakCounter += 1;
+        highestStreak = Math.max(highestStreak, streakCounter);
       } else {
         streakCounter = 0;
       }
@@ -139,7 +180,16 @@ const getMyHistory = async (req, res) => {
       };
     });
 
-    res.json(formattedHistory);
+    const currentStreak =
+      formattedHistory.length > 0
+        ? formattedHistory[formattedHistory.length - 1].streak
+        : 0;
+
+    res.json({
+      history: formattedHistory,
+      currentStreak,
+      highestStreak,
+    });
   } catch (err) {
     console.error('User history error:', err);
     res.status(500).json({ error: 'Failed to fetch weekly history' });
