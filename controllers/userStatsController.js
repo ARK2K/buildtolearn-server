@@ -17,11 +17,10 @@ function computeCurrentStreak(weeklyHistory = []) {
   for (let i = sorted.length - 1; i >= 0; i--) {
     const entry = sorted[i];
     const weekStart = new Date(entry.weekStart);
-    const weekEnd = new Date(entry.weekEnd);
 
     const missedWeek =
       prevWeekEnd &&
-      weekStart - prevWeekEnd > 7 * 24 * 60 * 60 * 1000; // gap > 7 days
+      weekStart - prevWeekEnd > 7 * 24 * 60 * 60 * 1000;
 
     if ((entry.submissions > 0 || entry.score > 0) && !missedWeek) {
       streak++;
@@ -69,10 +68,10 @@ function computeHighestStreak(weeklyHistory = []) {
   return highest;
 }
 
-// GET /api/user-stats/me → fetch logged-in user's current stats
+// GET /api/user-stats/me
 const getMyStats = async (req, res) => {
   try {
-    const userId = req.auth.userId; // Clerk's auth
+    const userId = req.auth.userId;
     const stats = await UserStats.findOne({ userId });
 
     if (!stats) {
@@ -104,13 +103,13 @@ const getMyStats = async (req, res) => {
   }
 };
 
-// GET /api/user-stats/weekly → top 10 users by weeklyScore
+// GET /api/user-stats/weekly
 const getWeeklyLeaderboard = async (req, res) => {
   try {
     const leaderboard = await UserStats.find({})
       .sort({ weeklyScore: -1 })
       .limit(10)
-      .select('displayName weeklyScore badges weeklyHistory'); // also fetch weeklyHistory
+      .select('displayName weeklyScore badges weeklyHistory');
 
     // Compute streak dynamically for each user
     const leaderboardWithStreaks = leaderboard.map((user) => {
@@ -132,7 +131,7 @@ const getWeeklyLeaderboard = async (req, res) => {
   }
 };
 
-// GET /api/user-stats/history → logged-in user's archived weekly results
+// GET /api/user-stats/history
 const getMyHistory = async (req, res) => {
   try {
     const userId = req.auth.userId;
@@ -159,7 +158,7 @@ const getMyHistory = async (req, res) => {
         weekStart - prevWeekEnd > 7 * 24 * 60 * 60 * 1000;
 
       if ((entryObj.submissions > 0 || entryObj.score > 0) && !missedWeek) {
-        streakCounter += 1;
+        streakCounter++;
         highestStreak = Math.max(highestStreak, streakCounter);
       } else {
         streakCounter = 0;
