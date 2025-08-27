@@ -1,6 +1,40 @@
 const UserStats = require('../models/UserStats');
 const { updateUserStats } = require('../utils/userStats');
 
+// --- helper to compute dynamic streak from history ---
+function computeCurrentStreak(weeklyHistory = []) {
+  if (!weeklyHistory.length) return 0;
+
+  // Sort by week start date
+  const sorted = [...weeklyHistory].sort(
+    (a, b) => new Date(a.weekStart) - new Date(b.weekStart)
+  );
+
+  let streak = 0;
+  let prevWeekEnd = null;
+
+  // Traverse backwards from most recent week
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const entry = sorted[i];
+    const weekStart = new Date(entry.weekStart);
+    const weekEnd = new Date(entry.weekEnd);
+
+    const missedWeek =
+      prevWeekEnd &&
+      weekStart - prevWeekEnd > 7 * 24 * 60 * 60 * 1000; // gap > 7 days
+
+    if ((entry.submissions > 0 || entry.score > 0) && !missedWeek) {
+      streak++;
+    } else {
+      break; // streak ends
+    }
+
+    prevWeekEnd = weekStart;
+  }
+
+  return streak;
+}
+
 // GET /api/user-stats/me → fetch logged-in user's current stats
 const getMyStats = async (req, res) => {
   try {
@@ -20,7 +54,13 @@ const getMyStats = async (req, res) => {
       });
     }
 
-    res.json(stats);
+    // Compute streak dynamically
+    const currentStreak = computeCurrentStreak(stats.weeklyHistory);
+
+    res.json({
+      ...stats.toObject(),
+      streak: currentStreak,
+    });
   } catch (err) {
     console.error('User stats error:', err);
     res.status(500).json({ error: 'Failed to fetch user stats' });
@@ -33,9 +73,20 @@ const getWeeklyLeaderboard = async (req, res) => {
     const leaderboard = await UserStats.find({})
       .sort({ weeklyScore: -1 })
       .limit(10)
-      .select('displayName weeklyScore streak badges');
+      .select('displayName weeklyScore badges weeklyHistory'); // also fetch weeklyHistory
 
-    res.json(leaderboard);
+    // Compute streak dynamically for each user
+    const leaderboardWithStreaks = leaderboard.map((user) => {
+      const streak = computeCurrentStreak(user.weeklyHistory || []);
+      return {
+        displayName: user.displayName,
+        weeklyScore: user.weeklyScore,
+        badges: user.badges,
+        streak,
+      };
+    });
+
+    res.json(leaderboardWithStreaks);
   } catch (err) {
     console.error('Weekly leaderboard error:', err);
     res.status(500).json({ error: 'Failed to fetch weekly leaderboard' });
@@ -48,38 +99,42 @@ const getMyHistory = async (req, res) => {
     const userId = req.auth.userId;
     const stats = await UserStats.findOne({ userId }).select('weeklyHistory');
 
-    // Always return an array (empty if no history or no user stats yet)
     const history = stats?.weeklyHistory || [];
 
-    // Sort history by week start date (oldest → newest for streak progression)
+    // Sort history oldest → newest
     const sortedHistory = history.sort(
       (a, b) => new Date(a.weekStart) - new Date(b.weekStart)
     );
 
-    // Track streak progression
     let streakCounter = 0;
-    const formattedHistory = sortedHistory.map(entry => {
-      const weekStart = new Date(entry.weekStart);
-      const weekEnd = new Date(entry.weekEnd);
+    let prevWeekEnd = null;
 
-      // Update streak (resets if no submissions or score is 0)
-      if (entry.submissions > 0 || entry.score > 0) {
+    const formattedHistory = sortedHistory.map((entry) => {
+      const entryObj = entry.toObject ? entry.toObject() : entry;
+      const weekStart = new Date(entryObj.weekStart);
+      const weekEnd = new Date(entryObj.weekEnd);
+
+      const missedWeek =
+        prevWeekEnd &&
+        weekStart - prevWeekEnd > 7 * 24 * 60 * 60 * 1000; // gap > 7 days
+
+      if ((entryObj.submissions > 0 || entryObj.score > 0) && !missedWeek) {
         streakCounter += 1;
       } else {
         streakCounter = 0;
       }
 
-      const label = `${weekStart.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      })} - ${weekEnd.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      })}`;
+      prevWeekEnd = weekEnd;
 
       return {
-        ...entry.toObject(),
-        label,
+        ...entryObj,
+        label: `${weekStart.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+        })} - ${weekEnd.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+        })}`,
         streak: streakCounter,
       };
     });
@@ -91,9 +146,9 @@ const getMyHistory = async (req, res) => {
   }
 };
 
-module.exports = { 
-  getMyStats, 
-  getWeeklyLeaderboard, 
-  getMyHistory, 
-  updateUserStats 
+module.exports = {
+  getMyStats,
+  getWeeklyLeaderboard,
+  getMyHistory,
+  updateUserStats,
 };
